@@ -1,7 +1,7 @@
 import express, { json } from 'express';
 import cors from 'cors';
 import { MongoClient } from 'mongodb';
-//import joi from 'joi';
+import joi from 'joi';
 import dotenv from 'dotenv';
 import dayjs from 'dayjs';
 
@@ -11,8 +11,19 @@ const server = express();
 server.use(json());
 server.use(cors());
 
+const schema = joi.object(
+    {
+        name: joi.string().required()
+    }
+)
+
 server.post('/participants', async (req, res) => {
     const user = req.body;
+
+    const validation = schema.validate(user);
+    if(validation.error){
+        return res.sendStatus(422);
+    }
 
     const mongoClient = new MongoClient(process.env.MONGO_URI);
     await mongoClient.connect()
@@ -44,4 +55,4 @@ server.post('/participants', async (req, res) => {
 
 server.listen(5000, () => {
     console.log('Running on http://localhost:5000');
-})
+});
