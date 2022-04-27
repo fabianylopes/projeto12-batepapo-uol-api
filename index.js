@@ -53,6 +53,17 @@ server.post('/participants', async (req, res) => {
     res.sendStatus(201);
 });
 
+server.get('/participants', async (req, res) => {
+    const mongoClient = new MongoClient(process.env.MONGO_URI);
+    await mongoClient.connect()
+
+    const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
+    const participants = await participantsCollection.find({}).toArray();
+
+    mongoClient.close();
+    res.send(participants);
+});
+
 server.listen(5000, () => {
     console.log('Running on http://localhost:5000');
 });
