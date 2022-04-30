@@ -5,6 +5,7 @@ import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import joi from 'joi';
 import dayjs from 'dayjs';
+import { text } from 'express';
 
 dotenv.config();
 const database = process.env.MONGO_URI;
@@ -13,16 +14,20 @@ const app = express();
 app.use(json());
 app.use(cors());
 
-const schema = joi.object(
-    {
-        name: joi.string().required()
-    }
-);
+const participantSchema = joi.object({
+    name: joi.string().required()
+});
+
+const messageSchema = joi.object({
+    to: joi.string().required(),
+    text: joi.string().required(),
+    type: joi.string().valid('message', 'private_message')
+})
 
 app.post('/participants', async (req, res) => {
     const participant = req.body;
 
-    const validation = schema.validate(participant);
+    const validation = participantSchema.validate(participant);
     if(validation.error){
         return res.sendStatus(422)
     }
@@ -65,7 +70,7 @@ app.get('/participants', async (req, res) => {
 
     try{
         const mongoClient = new MongoClient(database);
-        await mongoClient.connect();
+        await mongoClient.connect()
         
         const participantsCollection = mongoClient.db('bate-papo-uol').collection('participants');
         const participants = await participantsCollection.find({}).toArray();
@@ -79,6 +84,41 @@ app.get('/participants', async (req, res) => {
     }
 
 });
+
+app.post('/messages', async (req, res) => {
+    const message = req.body;
+    const from = req.headers.user;
+  
+    const validation = messageSchema.validate(message);
+    if (validation.error) {
+      return res.sendStatus(422);
+    }
+  
+    try {
+      const mongoClient = new MongoClient(database);
+      await mongoClient.connect()
+  
+      const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
+      const messagesCollection = mongoClient.db("bate-papo-uol").collection("messages");
+  
+      const registeredParticipant = await participantsCollection.findOne({ name: from })
+      if (!registeredParticipant) {
+        return res.sendStatus(422);
+      }
+  
+      await messagesCollection.insertOne({
+        ...message,
+        from,
+        time: dayjs().format("HH:mm:ss")
+      });
+  
+      await mongoClient.close();
+      res.sendStatus(201);
+    } catch (error) {
+      console.log(error);
+      res.sendStatus(500);
+    }
+  });
 
 app.listen(5000, () => {
     console.log(chalk.blue.bold('Running on http://localhost:5000'));
