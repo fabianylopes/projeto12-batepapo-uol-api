@@ -70,7 +70,7 @@ app.get('/participants', async (req, res) => {
 
     try{
         const mongoClient = new MongoClient(database);
-        await mongoClient.connect()
+        await mongoClient.connect();
         
         const participantsCollection = mongoClient.db('bate-papo-uol').collection('participants');
         const participants = await participantsCollection.find({}).toArray();
@@ -96,7 +96,7 @@ app.post('/messages', async (req, res) => {
   
     try {
       const mongoClient = new MongoClient(database);
-      await mongoClient.connect()
+      await mongoClient.connect();
   
       const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
       const messagesCollection = mongoClient.db("bate-papo-uol").collection("messages");
@@ -119,6 +119,26 @@ app.post('/messages', async (req, res) => {
       res.sendStatus(500);
     }
   });
+
+app.get('/messages', async (req, res) => {
+
+    try {
+        const mongoClient = new MongoClient(database);
+        await mongoClient.connect();
+
+        const messagesCollection = mongoClient.db("bate-papo-uol").collection("messages");
+
+        const messages = await messagesCollection.find({}).toArray();
+
+        await mongoClient.close();
+        res.send(messages);
+        
+    } catch (error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+
+});
 
 app.listen(5000, () => {
     console.log(chalk.blue.bold('Running on http://localhost:5000'));
