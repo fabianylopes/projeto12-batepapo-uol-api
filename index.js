@@ -1,69 +1,85 @@
 import express, { json } from 'express';
+import chalk from 'chalk';
 import cors from 'cors';
 import { MongoClient } from 'mongodb';
-import joi from 'joi';
 import dotenv from 'dotenv';
+import joi from 'joi';
 import dayjs from 'dayjs';
 
 dotenv.config();
+const database = process.env.MONGO_URI;
 
-const server = express();
-server.use(json());
-server.use(cors());
+const app = express();
+app.use(json());
+app.use(cors());
 
 const schema = joi.object(
     {
         name: joi.string().required()
     }
-)
+);
 
-server.post('/participants', async (req, res) => {
-    const user = req.body;
+app.post('/participants', async (req, res) => {
+    const participant = req.body;
 
-    const validation = schema.validate(user);
+    const validation = schema.validate(participant);
     if(validation.error){
-        return res.sendStatus(422);
+        return res.sendStatus(422)
     }
 
-    const mongoClient = new MongoClient(process.env.MONGO_URI);
-    await mongoClient.connect()
+    try {
+        const mongoClient = new MongoClient(database);
+        await mongoClient.connect();
 
-    const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
-    const messagesCollection = mongoClient.db("bate-papo-uol").collection("messages");
+        const participantsCollection = mongoClient.db('bate-papo-uol').collection('participants');
+        const messagesCollection = mongoClient.db('bate-papo-uol').collection('messages');
 
-    const registeredParticipant = await participantsCollection.findOne({ name: user.name });
-    if(registeredParticipant){
-        return res.sendStatus(409);
-    }
-
-    await participantsCollection.insertOne({ ...user, lastStatus: Date.now() });
-
-    await messagesCollection.insertOne(
-        {
-            from: user.name, 
-            to: 'Todos', 
-            text: 'entra na sala...', 
-            type: 'status', 
-            time: dayjs().format('HH:mm:ss')
+        const registeredParticipant = await participantsCollection.findOne({ name: participant.name });
+        if(registeredParticipant){
+            return res.sendStatus(409)
         }
-    );
 
-    mongoClient.close();
+        await participantsCollection.insertOne({ ...participant, lastStatus: Date.now()});
 
-    res.sendStatus(201);
+        await messagesCollection.insertOne(
+            {
+                from: participant.name, 
+                to: 'Todos', 
+                text: 'entra na sala...', 
+                type: 'status', 
+                time: dayjs().format('HH:mm:ss')
+            }
+        );
+
+        mongoClient.close();
+        res.sendStatus(201)
+
+    } catch(error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+
 });
 
-server.get('/participants', async (req, res) => {
-    const mongoClient = new MongoClient(process.env.MONGO_URI);
-    await mongoClient.connect()
+app.get('/participants', async (req, res) => {
 
-    const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
-    const participants = await participantsCollection.find({}).toArray();
+    try{
+        const mongoClient = new MongoClient(database);
+        await mongoClient.connect();
+        
+        const participantsCollection = mongoClient.db('bate-papo-uol').collection('participants');
+        const participants = await participantsCollection.find({}).toArray();
+        
+        mongoClient.close();
+        res.send(participants);
 
-    mongoClient.close();
-    res.send(participants);
+    }catch(error) {
+        console.log(error);
+        res.sendStatus(500);
+    }
+
 });
 
-server.listen(5000, () => {
-    console.log('Running on http://localhost:5000');
+app.listen(5000, () => {
+    console.log(chalk.blue.bold('Running on http://localhost:5000'));
 });
