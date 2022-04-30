@@ -121,6 +121,7 @@ app.post('/messages', async (req, res) => {
   });
 
 app.get('/messages', async (req, res) => {
+    const limit = req.query.limit
 
     try {
         const mongoClient = new MongoClient(database);
@@ -136,6 +137,36 @@ app.get('/messages', async (req, res) => {
     } catch (error) {
         console.log(error);
         res.sendStatus(500);
+    }
+
+});
+
+app.post('/status', async (req, res) => {
+    const participant = req.headers.user;
+  
+    try {
+        const mongoClient = new MongoClient(database);
+        await mongoClient.connect();
+    
+        const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
+    
+        const registeredParticipant = await participantsCollection.findOne({ name: participant });
+            if(!registeredParticipant){
+                return res.sendStatus(404)
+            }
+        
+        await participantsCollection.updateOne({
+            _id: registeredParticipant._id
+        }, {
+            $set: { lastStatus: Date.now() }
+        });
+
+  
+      await mongoClient.close();
+      res.sendStatus(200);
+    } catch (error) {
+      console.log(error);
+      res.sendStatus(500);
     }
 
 });
