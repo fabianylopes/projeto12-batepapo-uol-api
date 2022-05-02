@@ -121,7 +121,8 @@ app.post('/messages', async (req, res) => {
   });
 
 app.get('/messages', async (req, res) => {
-    const limit = req.query.limit
+    const limit = parseInt(req.query.limit);
+    const participant = req.headers.user;
 
     try {
         const mongoClient = new MongoClient(database);
@@ -131,8 +132,17 @@ app.get('/messages', async (req, res) => {
 
         const messages = await messagesCollection.find({}).toArray();
 
+        const filteredMessages = messages.filter(m => {
+            return m.to === participant || m.from === participant || m.to === 'Todos' || m.type === 'message'
+        })
+
         await mongoClient.close();
-        res.send(messages);
+
+        if(limit){
+            return res.send(filteredMessages.slice(-limit));
+        }
+
+        res.send(filteredMessages);
         
     } catch (error) {
         console.log(error);
