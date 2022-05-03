@@ -5,7 +5,6 @@ import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 import joi from 'joi';
 import dayjs from 'dayjs';
-import { text } from 'express';
 
 dotenv.config();
 const database = process.env.MONGO_URI;
@@ -32,12 +31,12 @@ app.post('/participants', async (req, res) => {
         return res.sendStatus(422)
     }
 
-    try {
+    try{
         const mongoClient = new MongoClient(database);
         await mongoClient.connect();
 
-        const participantsCollection = mongoClient.db('bate-papo-uol').collection('participants');
-        const messagesCollection = mongoClient.db('bate-papo-uol').collection('messages');
+        const participantsCollection = mongoClient.db('chat-uol').collection('participants');
+        const messagesCollection = mongoClient.db('chat-uol').collection('messages');
 
         const registeredParticipant = await participantsCollection.findOne({ name: participant.name });
         if(registeredParticipant){
@@ -68,15 +67,16 @@ app.post('/participants', async (req, res) => {
 
 app.get('/participants', async (req, res) => {
 
-    try{
+    try{        
         const mongoClient = new MongoClient(database);
         await mongoClient.connect();
-        
-        const participantsCollection = mongoClient.db('bate-papo-uol').collection('participants');
+
+        const participantsCollection = mongoClient.db('chat-uol').collection('participants');
         const participants = await participantsCollection.find({}).toArray();
         
         mongoClient.close();
         res.send(participants);
+
 
     }catch(error) {
         console.log(error);
@@ -95,29 +95,29 @@ app.post('/messages', async (req, res) => {
     }
   
     try {
-      const mongoClient = new MongoClient(database);
-      await mongoClient.connect();
-  
-      const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
-      const messagesCollection = mongoClient.db("bate-papo-uol").collection("messages");
-  
-      const registeredParticipant = await participantsCollection.findOne({ name: from })
-      if (!registeredParticipant) {
-        return res.sendStatus(422);
-      }
-  
-      await messagesCollection.insertOne({
-        ...message,
-        from,
-        time: dayjs().format("HH:mm:ss")
-      });
-  
-      await mongoClient.close();
-      res.sendStatus(201);
-    } catch (error) {
-      console.log(error);
-      res.sendStatus(500);
-    }
+        const mongoClient = new MongoClient(database);
+        await mongoClient.connect();
+
+        const participantsCollection = mongoClient.db('chat-uol').collection('participants');
+        const messagesCollection = mongoClient.db('chat-uol').collection('messages');
+    
+        const registeredParticipant = await participantsCollection.findOne({ name: from })
+        if (!registeredParticipant) {
+            return res.sendStatus(422);
+        }
+    
+        await messagesCollection.insertOne({
+            ...message,
+            from,
+            time: dayjs().format("HH:mm:ss")
+        });
+    
+        await mongoClient.close();
+        res.sendStatus(201);
+        } catch (error) {
+        console.log(error);
+        res.sendStatus(500);
+        }
   });
 
 app.get('/messages', async (req, res) => {
@@ -128,7 +128,7 @@ app.get('/messages', async (req, res) => {
         const mongoClient = new MongoClient(database);
         await mongoClient.connect();
 
-        const messagesCollection = mongoClient.db("bate-papo-uol").collection("messages");
+        const messagesCollection = mongoClient.db('chat-uol').collection('messages');
 
         const messages = await messagesCollection.find({}).toArray();
 
@@ -157,8 +157,8 @@ app.post('/status', async (req, res) => {
     try {
         const mongoClient = new MongoClient(database);
         await mongoClient.connect();
-    
-        const participantsCollection = mongoClient.db("bate-papo-uol").collection("participants");
+
+        const participantsCollection = mongoClient.db('chat-uol').collection('participants');
     
         const registeredParticipant = await participantsCollection.findOne({ name: participant });
             if(!registeredParticipant){
@@ -174,12 +174,50 @@ app.post('/status', async (req, res) => {
   
       await mongoClient.close();
       res.sendStatus(200);
+
     } catch (error) {
       console.log(error);
       res.sendStatus(500);
     }
 
 });
+
+setInterval(async () => {
+    try {
+      const lastTenSeconds = Date.now() - 10000;
+  
+      const mongoClient = new MongoClient(database);
+      await mongoClient.connect()
+  
+      const participantsCollection = mongoClient.db("chat-uol").collection("participants");
+      const messagesCollection = mongoClient.db("chat-uol").collection("messages");
+  
+      const participants = await participantsCollection.find({}).toArray();
+  
+      const inactiveUsers = participants.filter(p => p.lastStatus <= lastTenSeconds)
+      if (inactiveUsers.length === 0) {
+        await mongoClient.close();
+        return;
+      }
+  
+      const outMessages = inactiveUsers.map(p => {
+        return {
+          from: p.name,
+          to: 'Todos',
+          text: 'sai da sala...',
+          type: 'status',
+          time: dayjs().format("HH:mm:ss")
+        }
+      })
+  
+      await messagesCollection.insertMany(outMessages);
+  
+      await mongoClient.close();
+
+    } catch (error) {
+      console.log(error);
+    }
+  }, 15000)
 
 app.listen(5000, () => {
     console.log(chalk.blue.bold('Running on http://localhost:5000'));
